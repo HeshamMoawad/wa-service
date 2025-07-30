@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { Chat , Contact , WAMessage } from '@whiskeysockets/baileys';
+import { Chat , Contact , Message } from 'whatsapp-web.js';
+// import { Chat , Contact , WAMessage } from '@whiskeysockets/baileys';
 import { DBChat } from '../database/schemas/chat.schema';
 import { DBContact } from '../database/schemas/contact.schema';
 import { DBMessage } from '../database/schemas/message.schema';
@@ -18,7 +19,7 @@ export class SaverService {
         @InjectModel(DBMessage.name) private messageModel: Model<DBMessage>,
     ) {}
 
-    async savePhone(phone: {phoneNumber: string , jid: string}) {
+    async savePhone(phone: {name:string,phoneNumber: string , jid: string}) {
         const phoneData = await this.phoneModel.find({phoneNumber: phone.phoneNumber});
         if(phoneData.length > 0){
             return phoneData[0];
@@ -48,10 +49,10 @@ export class SaverService {
         });
         return newContact;
     }
-    async saveMessage(message: WAMessage , phone: string|number ) {
+    async saveMessage(message: Message , phone: string|number ) {
         const data = {
             phone: phone,
-            chat: message.key.remoteJid,
+            chat: message.id.id,
             message: message
         }
         const newMessage = await this.messageModel.insertMany(data,{
@@ -84,11 +85,11 @@ export class SaverService {
         });
         return newContacts;
     }
-    async saveMessages(messages: WAMessage[] , phone: string|number) {
+    async saveMessages(messages: Message[] , phone: string|number) {
         const data = messages.map(message => {
             return {
                 phone: phone,
-                chat: message.key.remoteJid,
+                chat: message.id.id,
                 message: message
             }
         })

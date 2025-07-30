@@ -1,16 +1,4 @@
-import { 
-    makeWASocket, 
-    useMultiFileAuthState , 
-    AuthenticationState,
-    DisconnectReason,
-    proto,
-    WASocket,
-    Chat,
-    Contact,
-    WAMessage,
-    AnyMessageContent,
-    MiscMessageGenerationOptions
-    } from '@whiskeysockets/baileys';
+import { Client, LocalAuth, MessageMedia, Chat, Contact, Message } from 'whatsapp-web.js';
 import { EventEmitter } from 'events';
 
 
@@ -28,61 +16,70 @@ export enum Events {
     CALL = 'call',
 }
 
-export class WAClient extends EventEmitter{
-    private client: WASocket;
-    me: Contact | undefined;
-    constructor(private readonly authState: AuthenticationState,private readonly saveCreds: () => Promise<void>) {
+export class WAClient extends EventEmitter {
+    client: Client;
+    me_id: string | undefined;
+
+    constructor(private clientId: string) {
         super();
         this.connect();
     }
-    
-    private async connect() {
-        this.client = makeWASocket({
-            auth: this.authState,
-        });
-        this.client.ev.on('creds.update', this.saveCreds);
-        this.me = this.client.user;
-        this.client.ev.on('connection.update', (update) => {
-            const { connection , lastDisconnect , qr } = update;
-            if (qr) {
-                this.emit(Events.QR, qr);
-            }
-            else if (connection === 'close') {
-                this.onClosedConnection(lastDisconnect);
-            }
-            else if (connection === 'open') {
-                this.onOpenConnection();
-            }
-        });
-        this.client.ev.on('messaging-history.set', (data:{chats: Chat[],contacts: Contact[],messages: WAMessage[],isLatest?: boolean,progress?: number,syncType?: proto.HistorySync.HistorySyncType,peerDataRequestSessionId?: string})=>{
-            this.onLoadMessages(data.messages);
-            this.onLoadChats(data.chats);
-            this.onLoadContacts(data.contacts);
-        });
-        this.client.ev.on('messages.upsert', (messages) => {
-            const newMessages = messages.messages.filter((message) => message.key.fromMe === false);
-            if (newMessages.length > 0) {
-                this.emit(Events.NEW_MESSAGE, newMessages);
-            }
-            const sendedMessages = messages.messages.filter((message) => message.key.fromMe === true);
-            if (sendedMessages.length > 0) {
-                this.emit(Events.SEND_MESSAGE, sendedMessages);
-            }
-        });
-        this.client.ev.on('contacts.upsert', (contacts) => {
-            this.emit(Events.LOAD_CONTACTS, contacts);
-        });
-        this.client.ev.on('chats.upsert', (chats) => {
-            this.emit(Events.LOAD_CHATS, chats);
-        });
-        this.client.ev.on('call', (call) => {
-            this.emit(Events.CALL, call);
+
+    private connect() {
+        this.client = new Client({
+            authStrategy: new LocalAuth({
+                clientId: this.clientId,
+                dataPath: './data',
+            }),
+            puppeteer: { headless: true },
         });
 
-    }
+        this.client.on('qr', (qr: string) => {
+            this.emit(Events.QR, qr);
+        });
 
-    private onLoadMessages(messages: WAMessage[]) {
-        this.emit(Events.LOAD_MESSAGES, messages);
+        this.client.on('ready', () => {
+            this.me_id = this.client.info.wid.toString();
+            this.onOpenConnection();
+        });
+
+        this.client.on('authenticated', () => {
+            this.emit(Events.SUCCESS_LOGIN);
+        });
+
+        this.client.on('auth_failure', () => {
+            this.emit(Events.CLOSED_CONNECTION);
+        });
+
+        this.client.on('disconnected', () => {
+            this.emit(Events.CLOSED_CONNECTION);
+        });
+
+        this.client.on('message', (message: Message) => {
+            if (message.fromMe) {
+                this.emit(Events.SEND_MESSAGE, [message]);
+            } else {
+                this.emit(Events.NEW_MESSAGE, [message]);
+            }
+        });
+
+        this.client.on('message_create', (message: Message) => {
+            // Handle sent messages if needed
+        });
+
+        this.client.on('message_ack', (message: Message) => {
+            // Handle message acknowledgement if needed
+        });
+
+        this.client.on('chats_received', (chats: Chat[]) => {
+            this.onLoadChats(chats);
+        });
+
+        this.client.on('contacts_received', (contacts: Contact[]) => {
+            this.onLoadContacts(contacts);
+        });
+
+        this.client.initialize();
     }
 
     private onLoadChats(chats: Chat[]) {
@@ -93,50 +90,52 @@ export class WAClient extends EventEmitter{
         this.emit(Events.LOAD_CONTACTS, contacts);
     }
 
+    async archiveChat(chatId: string) {
+        const chat = await this.client.getChatById(chatId);
+        await chat.archive();
+        await chat.mute();
+        return chat;
+    }
+
     private async onOpenConnection() {
         this.emit(Events.SUCCESS_LOGIN);
     }
-    private async onClosedConnection(lastDisconnect: any) {
-        const reason = (lastDisconnect?.error)?.output?.statusCode;
-        switch (reason) {
-            case DisconnectReason.restartRequired:
-                this.connect();
-                break;
-            case DisconnectReason.connectionLost:
-                this.connect();
-                break;
-            case DisconnectReason.timedOut:
-                this.connect();
-                break;
-            case DisconnectReason.loggedOut:
-                this.logout();
-                break;
-            case DisconnectReason.connectionClosed:
-                this.logout();
-                break;
-            default:
-                this.emit(Events.CLOSED_CONNECTION);
-                console.log("Closed connection",reason);
-                break;
-        }
-    }
-    
+
     async logout() {
-        this.client.logout();
+        await this.client.logout();
         this.emit(Events.CLOSED_CONNECTION);
         this.emit(Events.LOGGED_OUT);
     }
-    
-    async sendMessage(to: string, message: AnyMessageContent, options?: MiscMessageGenerationOptions) {
-        if (!to) throw new Error('No jid provided');
+
+    async sendMessage(to: string, message: string | MessageMedia, options?: any) {
+        if (!to) throw new Error('No chatId provided');
         if (!message) throw new Error('No message provided');
         if (!this.client) throw new Error('Client not initialized');
-        if (!to.endsWith('@s.whatsapp.net')) {
-            if (!to.endsWith('@c.us')) {
-                to = to + '@s.whatsapp.net';            
-            }
+        if (!to.endsWith('@c.us')) {
+            to = to + '@c.us';
         }
-        this.client.sendMessage(to, message,options);
+        const exist = await this.client.isRegisteredUser(to);
+        
+        console.log(to + " " + exist);
+        if (!exist) {
+            throw new Error('User not registered');
+        }
+        await this.client.sendMessage(to, message, options);
     }
-    
+    async getChatMessages(chatId: string , limit?: number , fromMe?: boolean) {
+        const chat = await this.client.getChatById(chatId);
+        const messages = await chat.fetchMessages({limit: limit || 10 , fromMe: fromMe || false });
+        return messages;
+    }
+    async getProfilePic(chatId: string) {
+        return this.client.getProfilePicUrl(chatId);
+    }
+    async getContacts() {
+        const contacts = await this.client.getContacts();
+        return contacts;
+    }
+    async getChats() {
+        const chats = await this.client.getChats();
+        return chats;
+    }
 }

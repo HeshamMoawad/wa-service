@@ -4,7 +4,9 @@ import { ChatSchema } from './schemas/chat.schema';
 import { ContactSchema } from './schemas/contact.schema';
 import { MessageSchema } from './schemas/message.schema';
 import { PhoneSchema } from './schemas/phone.schema';
-import { AccountSchema } from './schemas/accounts.schema';
+import { AccountSchema, AccountChatsSchema } from './schemas/accounts.schema';
+import { DatabaseController } from './database.controller';
+import { DatabaseService } from './database.service';
 
 @Module({
     imports: [
@@ -15,8 +17,11 @@ import { AccountSchema } from './schemas/accounts.schema';
             { name: 'DBMessage', schema: MessageSchema },
             { name: 'DBPhone', schema: PhoneSchema },
             { name: 'DBAccount', schema: AccountSchema },
+            { name: 'DBAccountChats', schema: AccountChatsSchema },
         ]),
     ],
     exports: [MongooseModule],
+    controllers: [DatabaseController],
+    providers: [DatabaseService],
 })
 export class DatabaseModule {}

@@ -2,7 +2,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
-import { DBPhone } from './phone.schema';
+import { DBChat } from './chat.schema';
 
 export enum Role {
     ADMIN = 'ADMIN',
@@ -28,17 +28,17 @@ export class DBAccount extends Document {
 }
 
 @Schema({ timestamps: true })
-export class AccountPhones extends Document {
+export class AccountChats extends Document {
     @Prop({ type: Types.ObjectId, ref: 'Account', required: true })
     account: Types.ObjectId;
 
-    @Prop({ type: [DBPhone], required: true })
-    phones: DBPhone[];
+    @Prop({ type: Types.ObjectId, ref: 'Chat', required: true })
+    chat: Types.ObjectId;
 
     
 }
 
 
 export const AccountSchema = SchemaFactory.createForClass(DBAccount);
-export const AccountPhonesSchema = SchemaFactory.createForClass(AccountPhones);
+export const AccountChatsSchema = SchemaFactory.createForClass(AccountChats);
 

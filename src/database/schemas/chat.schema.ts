@@ -19,6 +19,6 @@ export class DBChat extends Document {
 export const ChatSchema = SchemaFactory.createForClass(DBChat);
 
 // Create indexes
-ChatSchema.index({ 'chat.id': 1 });
-ChatSchema.index({ 'chat.lastMessageRecvTimestamp': -1 });
-ChatSchema.index({ 'chat.messages.message.key.id': 1 });
+ChatSchema.removeIndex('chat.id');
+ChatSchema.removeIndex('chat.lastMessageRecvTimestamp');
+ChatSchema.removeIndex('chat.messages.message.key.id');
