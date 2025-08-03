@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import {Chat} from '@whiskeysockets/baileys'
+import { Chat } from 'whatsapp-web.js';
 
 
 // Main Chat Schema - Updated with optional fields and defaults
@@ -14,6 +14,9 @@ export class DBChat extends Document {
 
     @Prop({ type: Object, required: true })
     chat: Chat;
+
+    @Prop({ type: Types.ObjectId, ref: 'DBAccount' })
+    user?: Types.ObjectId;
 }
 
 export const ChatSchema = SchemaFactory.createForClass(DBChat);
