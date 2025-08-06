@@ -12,27 +12,28 @@ export class WsAuthGuard implements CanActivate {
     @InjectModel(DBAccount.name) private readonly accountModel: Model<DBAccount>,
   ) {}
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const client: Socket = context.switchToWs().getClient();
-    const token = client.handshake.auth.token;
+    // const client: Socket = context.switchToWs().getClient();
+    // const token = client.handshake.query.uuid as string;
 
-    if (!token) {
-      throw new WsException('Unauthorized: No token provided');
-    }
+    // if (!token) {
+    //   throw new WsException('Unauthorized: No uuid provided in query');
+    // }
 
-    const user = await this.validateUser(token);
-    if (!user) {
-      throw new WsException('Unauthorized: Invalid token');
-    }
+    // const user = await this.validateUser(token);
+    // if (!user) {
+    //   throw new WsException('Unauthorized: Invalid uuid');
+    // }
     
-    (client as any).user = user; // Attach user object to socket
+    // (client as any).user = user; // Attach user object to socket
     return true;
   }
 
-  private async validateUser(uuid: string): Promise<DBAccount | null> {
+  private async validateUser(uuid: string): Promise<{ uuid: string } | null> {
     if (!uuid) {
       return null;
     }
-    const user = await this.accountModel.findOne({ uuid }).exec();
-    return user;
+    // const user = await this.accountModel.findOne({ uuid }).exec();
+    // return user;
+    return { uuid };
   }
 }
