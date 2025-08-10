@@ -1,84 +1,69 @@
-import { WebSocketGateway, SubscribeMessage, MessageBody, ConnectedSocket } from '@nestjs/websockets';
+import {
+  WebSocketGateway,
+  SubscribeMessage,
+  MessageBody,
+  ConnectedSocket,
+} from '@nestjs/websockets';
 import { WaService } from './wa.service';
-import { Socket  } from 'socket.io';
+import { Socket } from 'socket.io';
 import { WebSocketServer } from '@nestjs/websockets';
 import { Server } from 'socket.io';
 import { StoreService } from '../store/store.service';
 import { SaverService } from '../database/saver.service';
-import { OnGatewayConnection } from '@nestjs/websockets';
-import { instrument } from "@socket.io/admin-ui";
-
 import { Chat, Contact } from 'whatsapp-web.js';
-import { pushWFM } from './wfm';
-@WebSocketGateway(96,{}) 
-export class WaGateway { //  implements OnGatewayConnection
+
+@WebSocketGateway(1050, {})
+export class WaGateway {
+  //  implements OnGatewayConnection
   @WebSocketServer() server: Server;
-  private account:string | undefined;
-  private user:string | undefined;
-  private cache : Record<string,{chats: Chat[],contacts: Contact[]}> = {};
+  private cache: Record<string, { chats: Chat[]; contacts: Contact[] }> = {};
   constructor(
     private readonly waService: WaService,
     private readonly cacheService: StoreService,
-    private readonly saverService: SaverService
+    private readonly saverService: SaverService,
   ) {}
 
-
   @SubscribeMessage('init')
-  async init(@MessageBody('phone') phone: string, @ConnectedSocket() socket: Socket, @MessageBody('name') name?: string, @MessageBody('uuid') uuid?: string) {
-    if (!uuid) {
-      socket.emit("init", { success: false, error: "No UUID provided" });
+  async init(
+    @MessageBody('phone') phone: string,
+    @ConnectedSocket() socket: Socket,
+    @MessageBody('name') name?: string,
+  ): Promise<void> {
+    if (!phone) {
+      socket.emit('init', { success: false, error: 'phone is required' });
       return;
     }
-    
-    console.log("\nInitializing WhatsApp client for phone:", phone, "Name:", name, "UUID:", uuid);
-    
+
+    if (this.cache[phone]) {
+      socket.emit('init', {
+        success: true,
+        chats: this.cache[phone].chats,
+        contacts: this.cache[phone].contacts,
+      });
+      return;
+    }
+
     try {
-        const userId = await this.waService.init(phone, socket, name);
-        this.account = name;
-        this.user = uuid;
+      await this.waService.init(phone, socket, name);
 
-
-        if (!userId) {
-            throw new Error("Failed to initialize WhatsApp client: No user ID returned");
-        }
-        
-        console.log("WhatsApp client initialized successfully for user:", userId);
-        
-        // Add a small delay to ensure the client is fully ready
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        try {
-            const chats = await this.waService.getChats(); // userId
-            console.log("Fetched", chats?.length, "chats");
-            
-            const contacts = await this.waService.getContacts();
-            console.log("Fetched", contacts?.length, "contacts");
-            pushWFM(this.account!,this.user!,chats);
+      const onReady = (): void => {
+        Promise.all([this.waService.getChats(), this.waService.getContacts()])
+          .then(([chats, contacts]) => {
             this.cache[phone] = { chats, contacts };
-            socket.emit("init", { success: true, chats, contacts });
-        } catch (fetchError) {
-            console.error("Error fetching chats/contacts:", fetchError);
-            // Even if fetching chats/contacts fails, the client is still initialized
-            socket.emit("init", { 
-                success: true, 
-                warning: `Client initialized but failed to load some data: ${fetchError.message}`,
-                chats: [],
-                contacts: []
-            });
-        }
+            socket.emit('init', { success: true, chats, contacts });
+          })
+          .catch((error: unknown) => {
+            const errorMessage =
+              error instanceof Error ? error.message : 'Unknown error';
+            socket.emit('init', { success: false, error: errorMessage });
+          });
+      };
+
+      this.waService.client.client.on('ready', onReady);
     } catch (error) {
-        console.error("Error in WhatsApp initialization:", error);
-        // Try to clean up on error
-        try {
-            await this.waService.logout();
-        } catch (cleanupError) {
-            console.error("Error during cleanup:", cleanupError);
-        }
-        
-        socket.emit("init", { 
-            success: false, 
-            error: error.message || "Failed to initialize WhatsApp client" 
-        });
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to initialize';
+      socket.emit('init', { success: false, error: errorMessage });
     }
   }
 
@@ -87,107 +72,58 @@ export class WaGateway { //  implements OnGatewayConnection
     await this.waService.logout();
   }
   @SubscribeMessage('getChatMessages')
-  async getChatMessages(@MessageBody('chatId') chatId: string ,@ConnectedSocket() socket: Socket, @MessageBody('limit') limit?: number , @MessageBody('fromMe') fromMe?: boolean) {
-    console.log("\ngetChatMessages\n");
+  async getChatMessages(
+    @MessageBody('chatId') chatId: string,
+    @ConnectedSocket() socket: Socket,
+    @MessageBody('limit') limit = 50,
+    @MessageBody('fromMe') fromMe?: boolean,
+  ): Promise<void> {
     try {
-      const messages = await this.waService.getChatMessages(chatId,limit,fromMe);
+      const messages = await this.waService.getChatMessages(
+        chatId,
+        limit,
+        fromMe,
+      );
       socket.emit('getChatMessages', { success: true, messages });
     } catch (error) {
-      socket.emit('getChatMessages', { success: false, error: error.message });
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to get chat messages';
+      socket.emit('getChatMessages', { success: false, error: errorMessage });
     }
   }
 
   @SubscribeMessage('sendMessage')
   async sendMessage(
-    @MessageBody() data: { to: string; message: string | any; options?: any },
-    @ConnectedSocket() socket: Socket
-  ) {
-    const { to, message, options } = data;
-    console.log('Received sendMessage request:', { to, messageLength: String(message).length, options });
-    
+    @MessageBody()
+    message: { to: string; message: string; options?: Record<string, unknown> },
+    @ConnectedSocket() socket: Socket,
+  ): Promise<void> {
     try {
-      // Input validation
-      if (!to) {
-        throw new Error('Recipient (to) is required');
-      }
-      
-      if (!message) {
-        throw new Error('Message content is required');
-      }
-
-      // Process message content
-      let processedMessage = message;
-      if (typeof message === 'string') {
-        processedMessage = message.trim();
-        if (!processedMessage) {
-          throw new Error('Message cannot be empty');
-        }
-      }
-
-      console.log('Sending message to:', to, 'Length:', String(processedMessage).length);
-      
-      // Send the message
-      const messageResult = await this.waService.sendMessage(to, processedMessage, options);
-      
-      // Prepare success response
-      const response = { 
-        success: true,
-        timestamp: new Date().toISOString(),
-        to: to,
-        messageId: messageResult?.id?.id || 'unknown',
-        serverResponse: messageResult
-      };
-      
-      console.log('Message sent successfully:', response);
-      socket.emit('message_sent', response);
-      
-      // Update chats to reflect the new message
-      try {
-        await this.syncChats(socket);
-      } catch (syncError) {
-        console.error('Error syncing chats after message send:', syncError);
-        // Don't fail the message send if sync fails
-      }
-      
-      return response;
+      await this.waService.sendMessage(
+        message.to,
+        message.message,
+        message.options,
+      );
+      socket.emit('sendMessage', { success: true });
     } catch (error) {
-      console.error('Error in sendMessage:', error);
-      socket.emit('message_error', { 
-        success: false, 
-        error: error.message || 'Failed to send message',
-        originalMessage: { to, message: String(message).substring(0, 100) + '...' }
-      });
-      throw error; // This will trigger the global exception filter
-    }
-  }
-
-  private async syncChats(socket: Socket) {
-    try {
-      const chats = await this.waService.listChats();
-      pushWFM(this.account!,this.user!,chats);
-      socket.emit('sync_chats', { success: true, chats });
-    } catch (error) {
-      socket.emit('sync_chats', { success: false, error: error.message });
-    }
-  }
-
-  @SubscribeMessage('pinChat')
-  async pinChat(@MessageBody('chatId') chatId: string, @ConnectedSocket() socket: Socket) {
-    try {
-      await this.waService.pinChat(chatId);
-      await this.syncChats(socket);
-    } catch (error) {
-      socket.emit('pinChat', { success: false, error: error.message });
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to send message';
+      socket.emit('sendMessage', { success: false, error: errorMessage });
     }
   }
 
   @SubscribeMessage('archiveChat')
-  async archiveChat(@MessageBody('chatId') chatId: string, @ConnectedSocket() socket: Socket) {
+  async archiveChat(
+    @MessageBody('chatId') chatId: string,
+    @ConnectedSocket() socket: Socket,
+  ): Promise<void> {
     try {
       await this.waService.archiveChat(chatId);
       await this.syncChats(socket);
     } catch (error) {
-      socket.emit('archiveChat', { success: false, error: error.message });
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to archive chat';
+      socket.emit('archiveChat', { success: false, error: errorMessage });
     }
   }
 
@@ -201,21 +137,30 @@ export class WaGateway { //  implements OnGatewayConnection
     }
   }
   @SubscribeMessage('listChats')
-  async listChats(@ConnectedSocket() socket: Socket) {
+  async listChats(@ConnectedSocket() socket: Socket): Promise<void> {
     try {
       const chats = await this.waService.listChats();
       socket.emit('listChats', { success: true, chats });
     } catch (error) {
-      socket.emit('listChats', { success: false, error: error.message });
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to list chats';
+      socket.emit('listChats', { success: false, error: errorMessage });
     }
   }
   @SubscribeMessage('getProfilePic')
-  async getProfilePic(@MessageBody('chatId') chatId: string, @ConnectedSocket() socket: Socket) {
+  async getProfilePic(
+    @MessageBody('chatId') chatId: string,
+    @ConnectedSocket() socket: Socket,
+  ): Promise<void> {
     try {
       const profilePic = await this.waService.getProfilePic(chatId);
       socket.emit('getProfilePic', { success: true, profilePic });
     } catch (error) {
-      socket.emit('getProfilePic', { success: false, error: error.message });
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'Failed to get profile picture';
+      socket.emit('getProfilePic', { success: false, error: errorMessage });
     }
   }
 
@@ -299,4 +244,3 @@ export class WaGateway { //  implements OnGatewayConnection
     }
   }
 }
-

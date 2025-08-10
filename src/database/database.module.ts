@@ -9,19 +9,21 @@ import { DatabaseController } from './database.controller';
 import { DatabaseService } from './database.service';
 
 @Module({
-    imports: [
-        MongooseModule.forRoot('mongodb://root:password@localhost:27017/wa-server?authSource=admin'),
-        MongooseModule.forFeature([
-            { name: 'DBChat', schema: ChatSchema },
-            { name: 'DBContact', schema: ContactSchema },
-            { name: 'DBMessage', schema: MessageSchema },
-            { name: 'DBPhone', schema: PhoneSchema },
-            { name: 'DBAccount', schema: AccountSchema },
-            { name: 'DBAccountChats', schema: AccountChatsSchema },
-        ]),
-    ],
-    exports: [MongooseModule],
-    controllers: [DatabaseController],
-    providers: [DatabaseService],
+  imports: [
+    MongooseModule.forRoot(
+      'mongodb://root:password@localhost:27017/wa-server?authSource=admin',
+    ),
+    MongooseModule.forFeature([
+      { name: 'DBChat', schema: ChatSchema },
+      { name: 'DBContact', schema: ContactSchema },
+      { name: 'DBMessage', schema: MessageSchema },
+      { name: 'DBPhone', schema: PhoneSchema },
+      { name: 'DBAccount', schema: AccountSchema },
+      { name: 'DBAccountChats', schema: AccountChatsSchema },
+    ]),
+  ],
+  exports: [MongooseModule],
+  controllers: [DatabaseController],
+  providers: [DatabaseService],
 })
 export class DatabaseModule {}
