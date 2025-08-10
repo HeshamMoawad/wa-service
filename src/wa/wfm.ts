@@ -11,6 +11,6 @@ export const pushWFM = (account: string, user: string, chats: Chat[]) => {
     },
     body: JSON.stringify({ account, user, chats }),
   })
-    .then(async (res) => console.log(await res.text()))
-    .catch((err) => console.log(err));
+    // .then(async (res) => console.log(await res.text()))
+    // .catch((err) => console.log(err));
 };

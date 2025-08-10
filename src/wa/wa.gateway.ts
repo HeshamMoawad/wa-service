@@ -93,7 +93,8 @@ export class WaGateway { //  implements OnGatewayConnection
     console.log("\ngetChatMessages\n");
     try {
       const messages = await this.waService.getChatMessages(chatId,limit,fromMe);
-      socket.emit('getChatMessages', { success: true, messages });
+      const messages2 = await this.waService.getChatMessages(chatId,limit,!fromMe);
+      socket.emit('getChatMessages', { success: true, messages:[...messages,...messages2] });
     } catch (error) {
       socket.emit('getChatMessages', { success: false, error: error.message });
     }
@@ -172,7 +173,16 @@ export class WaGateway { //  implements OnGatewayConnection
       socket.emit('sync_chats', { success: false, error: error.message });
     }
   }
-
+  @SubscribeMessage('syncChats')
+  async sync_chats(@ConnectedSocket() socket: Socket) {
+    try {
+      const chats = await this.waService.listChats();
+      pushWFM(this.account!,this.user!,chats);
+      socket.emit('sync_chats', { success: true, chats });
+    } catch (error) {
+      socket.emit('sync_chats', { success: false, error: error.message });
+    }
+  }
   @SubscribeMessage('pinChat')
   async pinChat(@MessageBody('chatId') chatId: string, @ConnectedSocket() socket: Socket) {
     try {
