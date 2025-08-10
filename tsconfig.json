@@ -16,6 +16,10 @@
     "forceConsistentCasingInFileNames": true,
     "noImplicitAny": false,
     "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
+    "noFallthroughCasesInSwitch": false,
+    // "no-unsafe-call": "off",
+    // "no-unsafe-assignment": "off",
+    // "no-unsafe-optional-chaining": "off",
+    // "no-unsafe-return": "off"
   }
 }

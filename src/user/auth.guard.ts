@@ -1,15 +1,18 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/require-await */
 // auth.guard.ts
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { DBAccount } from '../database/schemas/accounts.schema';
-import { Socket } from 'socket.io';
-import { WsException } from '@nestjs/websockets';
+// import { Socket } from 'socket.io';
+// import { WsException } from '@nestjs/websockets';
 
 @Injectable()
 export class WsAuthGuard implements CanActivate {
   constructor(
-    @InjectModel(DBAccount.name) private readonly accountModel: Model<DBAccount>,
+    @InjectModel(DBAccount.name)
+    private readonly accountModel: Model<DBAccount>,
   ) {}
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // const client: Socket = context.switchToWs().getClient();
@@ -23,7 +26,7 @@ export class WsAuthGuard implements CanActivate {
     // if (!user) {
     //   throw new WsException('Unauthorized: Invalid uuid');
     // }
-    
+
     // (client as any).user = user; // Attach user object to socket
     return true;
   }
