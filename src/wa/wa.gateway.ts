@@ -12,7 +12,9 @@ import { StoreService } from '../store/store.service';
 import { SaverService } from '../database/saver.service';
 import { Chat, Contact } from 'whatsapp-web.js';
 import { pushWFM } from './wfm';
-@WebSocketGateway(1050,{}) 
+
+
+@WebSocketGateway({path:"/ws"}) 
 export class WaGateway { //  implements OnGatewayConnection
   @WebSocketServer() server: Server;
   private account:string | undefined;
