@@ -29,13 +29,11 @@ export class WaGateway { //  implements OnGatewayConnection
 
   @SubscribeMessage('init')
   async init(@MessageBody('phone') phone: string, @ConnectedSocket() socket: Socket, @MessageBody('name') name?: string, @MessageBody('uuid') uuid?: string) {
+    console.log("\nInitializing WhatsApp client for phone:", phone, "Name:", name, "UUID:", uuid);
     if (!uuid) {
       socket.emit("init", { success: false, error: "No UUID provided" });
       return;
-    }
-    
-    console.log("\nInitializing WhatsApp client for phone:", phone, "Name:", name, "UUID:", uuid);
-    
+    }    
     try {
         const userId = await this.waService.init(phone, socket, name);
         this.account = name;
