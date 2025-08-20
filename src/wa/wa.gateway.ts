@@ -14,7 +14,7 @@ import { Chat, Contact } from 'whatsapp-web.js';
 import { pushWFM } from './wfm';
 
 
-@WebSocketGateway({path:"/ws"}) 
+@WebSocketGateway() 
 export class WaGateway { //  implements OnGatewayConnection
   @WebSocketServer() server: Server;
   private account:string | undefined;
