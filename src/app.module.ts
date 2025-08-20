@@ -8,10 +8,18 @@ import { StoreService } from './store/store.service';
 import { StoreModule } from './store/store.module';
 import { UserModule } from './user/user.module';
 import { DatabaseModule } from './database/database.module';
-
+import { ConfigModule } from '@nestjs/config';
+import config from './config/configurations';
 
 @Module({
   imports: [
+    ConfigModule.forRoot(
+      {
+        isGlobal: true,
+        load: [config],
+        envFilePath: '.env',
+      },
+    ), // This loads .env file automatically
     AccountsModule,
     WaModule,
     StoreModule,

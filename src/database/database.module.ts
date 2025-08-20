@@ -7,11 +7,12 @@ import { PhoneSchema } from './schemas/phone.schema';
 import { AccountSchema, AccountChatsSchema } from './schemas/accounts.schema';
 import { DatabaseController } from './database.controller';
 import { DatabaseService } from './database.service';
+import config from '../config/configurations';
 
 @Module({
   imports: [
     MongooseModule.forRoot(
-      'mongodb://root:password@localhost:27017/wa-server?authSource=admin',
+      `mongodb://${config().database.user}:${config().database.password}@${config().database.host}:${config().database.port}/wa-server?authSource=admin`,
     ),
     MongooseModule.forFeature([
       { name: 'DBChat', schema: ChatSchema },

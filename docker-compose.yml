@@ -35,6 +35,22 @@ services:
     depends_on:
       - mongodb
 
+  wa-service:
+    image: wa-service
+    container_name: wa-service
+    build: .
+    ports:
+      - "3000:3000"
+    depends_on:
+      - redis
+      - mongodb
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MONGODB_HOST: mongodb
+      MONGODB_PORT: 27017
+      MONGODB_USER: root
+      MONGODB_PASSWORD: password
 volumes:
   redis_data:
   mongodb_data:
