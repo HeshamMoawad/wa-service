@@ -1,65 +1,41 @@
-# Stage 1: Build the application
-FROM node:24-alpine AS builder
+﻿FROM node:24-slim
 
-# Create app directory
-WORKDIR /usr/src/app
+# Install Chromium dependencies
+RUN apt-get update && apt-get install -y \
+  chromium \
+  fonts-liberation \
+  libappindicator3-1 \
+  libasound2 \
+  libatk-bridge2.0-0 \
+  libatk1.0-0 \
+  libcups2 \
+  libdbus-1-3 \
+  libgdk-pixbuf2.0-0 \
+  libnspr4 \
+  libnss3 \
+  libx11-xcb1 \
+  libxcomposite1 \
+  libxdamage1 \
+  libxrandr2 \
+  xdg-utils \
+  --no-install-recommends \
+  && apt-get clean \
+  && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies first to leverage Docker cache
+# Set env var so puppeteer-core can find system Chromium
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+
+# Create app dir
+WORKDIR /app
+
+# Install deps
 COPY package*.json ./
 
-# Install dependencies (including devDependencies for building)
 RUN npm install
 
-# Copy all source files
+# Copy source and build
 COPY . .
-
-# Build the application
 RUN npm run build
 
-
-ENV MONGODB_HOST=mongodb
-ENV MONGODB_PORT=27017
-ENV MONGODB_USER=root
-ENV MONGODB_PASSWORD=password
-
-ENV REDIS_HOST=redis
-ENV REDIS_PORT=6379
-
-EXPOSE 3000
-
-# Command to run the application
+# Start app
 CMD ["npm", "run", "start"]
-
-
-
-
-# # Stage 2: Production image
-# FROM node:18-alpine
-
-# # Create app directory
-# WORKDIR /usr/src/app
-
-# # Install production dependencies only
-# COPY --from=builder /usr/src/app/package*.json ./
-
-# # RUN npm ci --only=production
-
-# # Copy built application from builder
-# COPY --from=builder /usr/src/app/dist ./dist
-
-# ENV MONGODB_HOST=mongodb
-# ENV MONGODB_PORT=27017
-# ENV MONGODB_USER=root
-# ENV MONGODB_PASSWORD=password
-
-# ENV REDIS_HOST=redis
-# ENV REDIS_PORT=6379
-
-# # Expose the port the app runs on
-# EXPOSE 3000
-
-# # Command to run the application
-# CMD ["npm", "run", "start"]
-
-
-# HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 CMD [ "curl -f http://localhost:3000/health || exit 1" ]
