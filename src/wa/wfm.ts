@@ -1,6 +1,6 @@
 import { Chat } from 'whatsapp-web.js';
 
-export const WFM_URL = 'http://localhost:8000/api/users/whatsapp-number';
+export const WFM_URL = 'http://wfm.m.local/api/users/whatsapp-number';
 
 export const pushWFM = (account: string, user: string, chats: Chat[]) => {
   console.log('Pushing to WFM', account, user, chats.length);
@@ -11,6 +11,6 @@ export const pushWFM = (account: string, user: string, chats: Chat[]) => {
     },
     body: JSON.stringify({ account, user, chats }),
   })
-    // .then(async (res) => console.log(await res.text()))
-    // .catch((err) => console.log(err));
+    .then(async (res) => console.log(await res.text()))
+    .catch((err) => console.log(err));
 };
