@@ -1,6 +1,6 @@
 import { Chat } from 'whatsapp-web.js';
 
-export const WFM_URL = 'http://192.168.11.235:8000/api/users/whatsapp-number';
+export const WFM_URL = 'http://192.168.11.235/api/users/whatsapp-number';
 
 export const pushWFM = (account: string, user: string, chats: Chat[]) => {
   console.log('Pushing to WFM', account, user, chats.length);
