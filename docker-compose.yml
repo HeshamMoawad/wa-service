@@ -50,6 +50,11 @@ services:
       MONGODB_PORT: 27017
       MONGODB_USER: root
       MONGODB_PASSWORD: password
+    volumes:
+      - wa-service_data:/data
+      - wa-service_cache:/.wwebjs_cache
 volumes:
   redis_data:
   mongodb_data:
+  wa-service_data:
+  wa-service_cache:
