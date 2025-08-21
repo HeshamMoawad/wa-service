@@ -143,7 +143,14 @@ export class WaGateway { //  implements OnGatewayConnection
       
       console.log('Message sent successfully:', response);
       socket.emit('message_sent', response);
-      
+      try {
+        const messages = await this.waService.getChatMessages(to,1000,false);
+        const messages2 = await this.waService.getChatMessages(to,1000,true);
+        socket.emit('getChatMessages', { success: true, messages:[...messages,...messages2] });
+      } catch (error) {
+        socket.emit('getChatMessages', { success: false, error: error.message });
+      }
+  
       // Update chats to reflect the new message
       try {
         await this.syncChats(socket);
@@ -285,24 +292,28 @@ export class WaGateway { //  implements OnGatewayConnection
   async markChatAsRead(@MessageBody('chatId') chatId: string, @ConnectedSocket() socket: Socket) {
     try {
       if (!chatId) {
-        throw new Error('Chat ID is required');
+        socket.emit('markChatAsRead', { success: false, error: 'Chat ID is required' });
+        return;
       }
       
       // const result = await this.waService.markChatAsRead(chatId);
       await this.syncChats(socket);
-      this.waService.client?.sendSeen(chatId);  
+      const sended = await this.waService.client?.sendSeen(chatId);  
       socket.emit('markChatAsRead', { 
-        success: true, 
+        success: sended, 
         chatId,
-        message: "Chat marked as read" 
+        message: "Chat marked as read", 
+        sended 
       });
       
       // Also emit a 'chatMarkedAsSeen' event for backward compatibility
       socket.emit('chatMarkedAsSeen', { 
-        success: true, 
+        success: sended, 
         chatId,
-        message: "Chat marked as read" 
+        message: "Chat marked as read", 
+        sended 
       });
+      await this.syncChats(socket);
     } catch (error) {
       console.error('Error marking chat as read:', error);
       const errorMsg = error.message || 'Failed to mark chat as read';
